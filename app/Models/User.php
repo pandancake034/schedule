@@ -22,6 +22,8 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'contract_days',  // <--- Nieuw
+        'contract_hours', // <--- Nieuw
     ];
 
     /**

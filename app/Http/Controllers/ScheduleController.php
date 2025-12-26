@@ -72,22 +72,25 @@ class ScheduleController extends Controller
      * Maakt een nieuwe gebruiker aan + stelt basis beschikbaarheid in.
      */
     public function storeUser(Request $request) {
-        // Validatie
+        // 1. Validatie (inclusief nieuwe velden)
         $request->validate([
             'name' => 'required', 
             'email' => 'required|email|unique:users,email',
-            'shift_preference' => 'required' // AM, PM of BOTH
+            'contract_days' => 'required|integer|min:1|max:7', // <--- Nieuw
+            'contract_hours' => 'required|integer|min:1',      // <--- Nieuw
+            'shift_preference' => 'required' 
         ]);
         
-        // 1. Maak de gebruiker aan
+        // 2. Maak de gebruiker aan met de contractgegevens
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
-            'password' => bcrypt('welkom123') // Standaard wachtwoord
+            'contract_days' => $request->contract_days,   // <--- Opslaan
+            'contract_hours' => $request->contract_hours, // <--- Opslaan
+            'password' => bcrypt('welkom123')
         ]);
 
-        // 2. Maak beschikbaarheid aan voor ALLE 7 dagen (zodat ze ook in weekend kunnen)
-        // We gebruiken Engelse namen omdat PHP date('l') dat ook doet.
+        // 3. Maak beschikbaarheid aan (rest blijft hetzelfde)
         $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         
         foreach($days as $day) {
