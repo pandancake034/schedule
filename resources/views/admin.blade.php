@@ -70,6 +70,11 @@
             </div>
             <button type="submit" class="btn btn-primary w-100">🚀 Genereer Rooster</button>
         </form>
+        {{-- Nieuwe Wis-knop --}}
+        <form action="/nieuwegein/admin/clear" method="POST" onsubmit="return confirm('Weet je zeker dat je het HELE rooster wilt wissen? Dit kan niet ongedaan worden gemaakt!');">
+            @csrf
+            <button type="submit" class="btn btn-outline-danger w-100">🗑️ Wis volledig rooster</button>
+        </form>
     </div>
 </div>
 @endsection

@@ -22,4 +22,5 @@ Route::post('/nieuwegein/admin/create-user', [ScheduleController::class, 'storeU
 // De route die het algoritme start
 Route::post('/nieuwegein/admin/generate', [ScheduleController::class, 'generateSchedule']);
 
-
+// Route om het rooster te wissen
+Route::post('/nieuwegein/admin/clear', [ScheduleController::class, 'clearSchedule']);

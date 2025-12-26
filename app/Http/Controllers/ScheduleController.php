@@ -230,5 +230,13 @@ class ScheduleController extends Controller
 
         return redirect('/nieuwegein/team')->with('success', 'Collega verwijderd.');
     }
+/**
+     * Wist alle diensten uit de database (reset het rooster).
+     */
+    public function clearSchedule() {
+        // Truncate gooit de hele tabel leeg en reset de ID tellers
+        DB::table('schedules')->truncate();
 
+        return redirect('/nieuwegein/admin')->with('success', 'Het volledige rooster is gewist!');
+    }
 } // <--- DIT IS HET BELANGRIJKE SLUIT-HAAKJE VAN DE CLASS
