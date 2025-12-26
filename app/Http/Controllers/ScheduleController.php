@@ -5,7 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\User;
-use Carbon\Carbon; // Nodig voor datum berekeningen
+use App\Models\Availability; // Zorg dat deze erbij staat
+use Carbon\Carbon;
 
 class ScheduleController extends Controller
 {
@@ -72,25 +73,25 @@ class ScheduleController extends Controller
      * Maakt een nieuwe gebruiker aan + stelt basis beschikbaarheid in.
      */
     public function storeUser(Request $request) {
-        // 1. Validatie (inclusief nieuwe velden)
+        // 1. Validatie
         $request->validate([
             'name' => 'required', 
             'email' => 'required|email|unique:users,email',
-            'contract_days' => 'required|integer|min:1|max:7', // <--- Nieuw
-            'contract_hours' => 'required|integer|min:1',      // <--- Nieuw
+            'contract_days' => 'required|integer|min:1|max:7',
+            'contract_hours' => 'required|integer|min:1',
             'shift_preference' => 'required' 
         ]);
         
-        // 2. Maak de gebruiker aan met de contractgegevens
+        // 2. Maak de gebruiker aan
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
-            'contract_days' => $request->contract_days,   // <--- Opslaan
-            'contract_hours' => $request->contract_hours, // <--- Opslaan
+            'contract_days' => $request->contract_days,
+            'contract_hours' => $request->contract_hours,
             'password' => bcrypt('welkom123')
         ]);
 
-        // 3. Maak beschikbaarheid aan (rest blijft hetzelfde)
+        // 3. Maak beschikbaarheid aan
         $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         
         foreach($days as $day) {
@@ -112,50 +113,45 @@ class ScheduleController extends Controller
     public function generateSchedule(Request $request) {
         $startDate = Carbon::parse($request->start_date);
         
-        // Loop door de komende 7 dagen (van gekozen startdatum)
+        // Loop door de komende 7 dagen
         for ($i = 0; $i < 7; $i++) {
             $currentDate = $startDate->copy()->addDays($i);
-            $dayNameEnglish = $currentDate->format('l'); // Bijv: 'Monday' of 'Saturday'
+            $dayNameEnglish = $currentDate->format('l'); 
 
             // REGEL 1: BEZETTING BEPALEN
-            // Do & Vr = 1 persoon. De rest (Za, Zo, Ma, Di, Wo) = 2 personen.
             if ($dayNameEnglish == 'Thursday' || $dayNameEnglish == 'Friday') {
                 $neededPerShift = 1;
             } else {
                 $neededPerShift = 2;
             }
 
-            // We vullen zowel de Ochtend (AM) als Middag (PM) shift
             foreach(['AM', 'PM'] as $shift) {
-                
-                // 1. Tel hoeveel mensen er al staan (handmatig of eerder run)
+                // 1. Tel huidige bezetting
                 $currentCount = DB::table('schedules')
                     ->where('date', $currentDate->format('Y-m-d'))
                     ->where('shift_type', $shift)
                     ->count();
 
-                // 2. Hoeveel plekken zijn er nog open?
+                // 2. Plekken over?
                 $slotsToFill = $neededPerShift - $currentCount;
 
                 if ($slotsToFill > 0) {
-                    // 3. Zoek geschikte kandidaten
+                    // 3. Zoek kandidaten
                     $candidates = User::whereHas('availability', function($query) use ($dayNameEnglish, $shift) {
-                        // Moet beschikbaar zijn op deze dag EN (voorkeur voor deze shift OF flexibel)
                         $query->where('day_of_week', $dayNameEnglish)
                               ->whereIn('shift_preference', [$shift, 'BOTH']);
                     })
-                    // REGEL 2: Maximaal 5 werkdagen per week (garantie op 2 dagen vrij)
+                    // REGEL 2: Max 5 dagen
                     ->withCount(['schedules' => function($query) use ($startDate) {
                         $query->whereBetween('date', [$startDate, $startDate->copy()->addDays(6)]);
                     }])
                     ->having('schedules_count', '<', 5) 
-                    ->inRandomOrder() // Husselen voor eerlijke verdeling
-                    ->take($slotsToFill) // Pak zoveel mensen als we nodig hebben
+                    ->inRandomOrder()
+                    ->take($slotsToFill)
                     ->get();
 
                     // 4. Inplannen
                     foreach($candidates as $candidate) {
-                        // Check: Werkt deze persoon vandaag al? (Voorkom dubbele dienst op 1 dag)
                         $alreadyWorkingToday = DB::table('schedules')
                             ->where('user_id', $candidate->id)
                             ->where('date', $currentDate->format('Y-m-d'))
@@ -177,10 +173,9 @@ class ScheduleController extends Controller
 
         return redirect('/nieuwegein/schedule')->with('success', 'Rooster succesvol gegenereerd!');
     }
-}
 
-// ==========================================
-    // 4. CRUD ACTIES (EDIT & DELETE)
+    // ==========================================
+    // 4. CRUD ACTIES (EDIT & DELETE) - HIER TOEGEVOEGD
     // ==========================================
 
     /**
@@ -189,7 +184,7 @@ class ScheduleController extends Controller
     public function editUser($id) {
         $user = User::findOrFail($id);
         
-        // Haal de huidige voorkeur op (we pakken er eentje, aangezien ze bij aanmaken allemaal hetzelfde zijn)
+        // Haal de huidige voorkeur op
         $currentAvailability = $user->availability()->first();
         $currentPreference = $currentAvailability ? $currentAvailability->shift_preference : 'BOTH';
 
@@ -205,7 +200,7 @@ class ScheduleController extends Controller
         // 1. Validatie
         $request->validate([
             'name' => 'required',
-            'email' => 'required|email|unique:users,email,'.$user->id, // Negeer eigen email bij check
+            'email' => 'required|email|unique:users,email,'.$user->id,
             'contract_days' => 'required|integer|min:1|max:7',
             'contract_hours' => 'required|integer|min:1',
             'shift_preference' => 'required'
@@ -219,7 +214,7 @@ class ScheduleController extends Controller
             'contract_hours' => $request->contract_hours,
         ]);
 
-        // 3. Update Beschikbaarheid (alle dagen updaten naar nieuwe voorkeur)
+        // 3. Update Beschikbaarheid
         Availability::where('user_id', $user->id)
             ->update(['shift_preference' => $request->shift_preference]);
 
@@ -231,7 +226,9 @@ class ScheduleController extends Controller
      */
     public function deleteUser($id) {
         $user = User::findOrFail($id);
-        $user->delete(); // Door 'cascade' in de database worden availability en schedules ook verwijderd.
+        $user->delete();
 
         return redirect('/nieuwegein/team')->with('success', 'Collega verwijderd.');
     }
+
+} // <--- DIT IS HET BELANGRIJKE SLUIT-HAAKJE VAN DE CLASS
