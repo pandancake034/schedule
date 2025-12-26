@@ -10,16 +10,41 @@
             <div class="erp-card">
                 <h5 class="mb-3">Nieuwe Medewerker</h5>
                 <form action="/nieuwegein/admin/create-user" method="POST">
-                    @csrf <div class="mb-3">
-                        <label>Volledige Naam</label>
-                        <input type="text" name="name" class="form-control" required>
-                    </div>
-                    <div class="mb-3">
-                        <label>Email Adres</label>
-                        <input type="email" name="email" class="form-control" required>
-                    </div>
-                    <button type="submit" class="btn btn-success">Opslaan</button>
-                </form>
+    @csrf
+    
+    {{-- Toon foutmeldingen als de validatie mislukt --}}
+    @if ($errors->any())
+        <div class="alert alert-danger">
+            <ul class="m-0">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
+    <div class="mb-3">
+        <label>Volledige Naam</label>
+        <input type="text" name="name" class="form-control" required>
+    </div>
+    
+    <div class="mb-3">
+        <label>Email Adres</label>
+        <input type="email" name="email" class="form-control" required>
+    </div>
+
+    {{-- DIT VELD ONTBRAK: --}}
+    <div class="mb-3">
+        <label>Beschikbaarheid Voorkeur</label>
+        <select name="shift_preference" class="form-control">
+            <option value="BOTH">Beide (Ochtend & Middag)</option>
+            <option value="AM">Alleen Ochtend</option>
+            <option value="PM">Alleen Middag</option>
+        </select>
+    </div>
+
+    <button type="submit" class="btn btn-success">Opslaan</button>
+</form>
             </div>
         </div>
 
