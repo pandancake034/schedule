@@ -178,3 +178,60 @@ class ScheduleController extends Controller
         return redirect('/nieuwegein/schedule')->with('success', 'Rooster succesvol gegenereerd!');
     }
 }
+
+// ==========================================
+    // 4. CRUD ACTIES (EDIT & DELETE)
+    // ==========================================
+
+    /**
+     * Toon het bewerk formulier voor een specifieke gebruiker.
+     */
+    public function editUser($id) {
+        $user = User::findOrFail($id);
+        
+        // Haal de huidige voorkeur op (we pakken er eentje, aangezien ze bij aanmaken allemaal hetzelfde zijn)
+        $currentAvailability = $user->availability()->first();
+        $currentPreference = $currentAvailability ? $currentAvailability->shift_preference : 'BOTH';
+
+        return view('team_edit', compact('user', 'currentPreference'));
+    }
+
+    /**
+     * Update de gebruiker in de database.
+     */
+    public function updateUser(Request $request, $id) {
+        $user = User::findOrFail($id);
+
+        // 1. Validatie
+        $request->validate([
+            'name' => 'required',
+            'email' => 'required|email|unique:users,email,'.$user->id, // Negeer eigen email bij check
+            'contract_days' => 'required|integer|min:1|max:7',
+            'contract_hours' => 'required|integer|min:1',
+            'shift_preference' => 'required'
+        ]);
+
+        // 2. Update User tabel
+        $user->update([
+            'name' => $request->name,
+            'email' => $request->email,
+            'contract_days' => $request->contract_days,
+            'contract_hours' => $request->contract_hours,
+        ]);
+
+        // 3. Update Beschikbaarheid (alle dagen updaten naar nieuwe voorkeur)
+        Availability::where('user_id', $user->id)
+            ->update(['shift_preference' => $request->shift_preference]);
+
+        return redirect('/nieuwegein/team')->with('success', 'Gegevens van ' . $user->name . ' bijgewerkt!');
+    }
+
+    /**
+     * Verwijder een gebruiker.
+     */
+    public function deleteUser($id) {
+        $user = User::findOrFail($id);
+        $user->delete(); // Door 'cascade' in de database worden availability en schedules ook verwijderd.
+
+        return redirect('/nieuwegein/team')->with('success', 'Collega verwijderd.');
+    }
