@@ -48,11 +48,11 @@ class User extends Authenticatable
     }
 
     // ==========================================
-    // NIEUWE RELATIES TOEVOEGEN HIERONDER
+    // NIEUWE RELATIES (TOEVOEGEN)
     // ==========================================
 
     /**
-     * Een gebruiker heeft meerdere beschikbaarheden.
+     * Relatie: Een gebruiker heeft meerdere beschikbaarheden (dagen).
      */
     public function availability(): HasMany
     {
@@ -60,7 +60,7 @@ class User extends Authenticatable
     }
 
     /**
-     * Een gebruiker heeft meerdere ingeplande diensten.
+     * Relatie: Een gebruiker heeft meerdere ingeplande diensten.
      */
     public function schedules(): HasMany
     {
