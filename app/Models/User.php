@@ -6,6 +6,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Relations\HasMany; // <--- Toevoegen
 
 class User extends Authenticatable
 {
@@ -44,5 +45,25 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    // ==========================================
+    // NIEUWE RELATIES TOEVOEGEN HIERONDER
+    // ==========================================
+
+    /**
+     * Een gebruiker heeft meerdere beschikbaarheden.
+     */
+    public function availability(): HasMany
+    {
+        return $this->hasMany(Availability::class);
+    }
+
+    /**
+     * Een gebruiker heeft meerdere ingeplande diensten.
+     */
+    public function schedules(): HasMany
+    {
+        return $this->hasMany(Schedule::class);
     }
 }
