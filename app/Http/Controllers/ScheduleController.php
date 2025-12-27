@@ -184,7 +184,7 @@ class ScheduleController extends Controller
             } else {
                 // REGEL: Andere dagen (Zaterdag t/m Woensdag)
                 // - AM & PM shifts.
-                // - Wel opvullen tot 2 personen.
+                // - Wel opvullen tot target (normaal 2, Maandag AM = 1).
                 
                 $shiftsToCheck = ['AM', 'PM'];
                 
@@ -248,11 +248,18 @@ class ScheduleController extends Controller
     }
 
     /**
-     * Stap B: Vul de gaten op tot we 2 man per shift hebben.
+     * Stap B: Vul de gaten op tot we het target aantal per shift hebben.
      */
     private function fillShiftGaps($date, $shiftType, $weekStart, $weekEnd)
     {
+        $dayName = $date->format('l');
+
+        // REGEL AANPASSING: 
+        // Normaal 2 teamleiders, behalve Maandagochtend (Monday AM) -> dan 1.
         $targetPerShift = 2; 
+        if ($dayName === 'Monday' && $shiftType === 'AM') {
+            $targetPerShift = 1;
+        }
 
         $currentCount = DB::table('schedules')
             ->where('date', $date->format('Y-m-d'))
@@ -262,8 +269,6 @@ class ScheduleController extends Controller
         $needed = $targetPerShift - $currentCount;
 
         if ($needed <= 0) return;
-
-        $dayName = $date->format('l');
         
         $candidates = User::whereHas('availability', function($q) use ($dayName, $shiftType) {
             $q->where('day_of_week', $dayName);
