@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\User;
-use App\Models\Availability; // Zorg dat deze erbij staat
+use App\Models\Availability;
 use Carbon\Carbon;
 
 class ScheduleController extends Controller
@@ -44,13 +44,11 @@ class ScheduleController extends Controller
      * Stuurt JSON data terug naar FullCalendar.
      */
     public function getEvents() {
-        // Haal rooster op en koppel de naam van de gebruiker eraan
         $schedules = DB::table('schedules')
             ->join('users', 'schedules.user_id', '=', 'users.id')
             ->select('schedules.date', 'schedules.shift_type', 'users.name')
             ->get();
 
-        // Format data voor de frontend
         $events = $schedules->map(function($row) {
             // Blauw voor Ochtend, Groen voor Middag
             $color = ($row->shift_type == 'AM') ? '#0070d2' : '#04844b';
@@ -66,11 +64,11 @@ class ScheduleController extends Controller
     }
 
     // ==========================================
-    // 3. ACTIES (OPSLAAN & GENEREREN)
+    // 3. ACTIES (OPSLAAN, GENEREREN & WISSEN)
     // ==========================================
 
     /**
-     * Maakt een nieuwe gebruiker aan + stelt basis beschikbaarheid in.
+     * Maakt een nieuwe gebruiker aan (inclusief vaste dagen).
      */
     public function storeUser(Request $request) {
         $request->validate([
@@ -87,51 +85,27 @@ class ScheduleController extends Controller
             'email' => $request->email,
             'contract_days' => $request->contract_days,
             'contract_hours' => $request->contract_hours,
-            'fixed_days' => $request->fixed_days, // Opslaan van vaste dagen
+            'fixed_days' => $request->fixed_days, // Opslaan vaste dagen
             'password' => bcrypt('welkom123')
         ]);
 
         $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        
         foreach($days as $day) {
             DB::table('availabilities')->insert([
                 'user_id' => $user->id,
                 'day_of_week' => $day,
                 'shift_preference' => $request->shift_preference,
-                'created_at' => now(), 'updated_at' => now()
+                'created_at' => now(),
+                'updated_at' => now()
             ]);
         }
 
         return redirect('/nieuwegein/team')->with('success', 'Collega ' . $user->name . ' succesvol toegevoegd!');
     }
 
-    public function updateUser(Request $request, $id) {
-        $user = User::findOrFail($id);
-
-        $request->validate([
-            'name' => 'required',
-            'email' => 'required|email|unique:users,email,'.$user->id,
-            'contract_days' => 'required|integer|min:1|max:7',
-            'contract_hours' => 'required|integer|min:1',
-            'shift_preference' => 'required',
-            'fixed_days' => 'array'
-        ]);
-
-        $user->update([
-            'name' => $request->name,
-            'email' => $request->email,
-            'contract_days' => $request->contract_days,
-            'contract_hours' => $request->contract_hours,
-            'fixed_days' => $request->fixed_days, // Updaten
-        ]);
-
-        Availability::where('user_id', $user->id)
-            ->update(['shift_preference' => $request->shift_preference]);
-
-        return redirect('/nieuwegein/team')->with('success', 'Gegevens bijgewerkt!');
-    }
-
     /**
-     * HET VERNIEUWDE ALGORITME
+     * HET ALGORITME (Vernieuwd met vaste dagen & contract regels).
      */
     public function generateSchedule(Request $request) {
         $startDate = Carbon::parse($request->start_date);
@@ -157,8 +131,7 @@ class ScheduleController extends Controller
                 $fixedUsers = User::whereJsonContains('fixed_days', $dayNameEnglish)->get();
 
                 foreach($fixedUsers as $fixedUser) {
-                    // Check voorkeur (als iemand 'Alleen Ochtend' wil, plannen we hem niet 's middags, 
-                    // tenzij je vaste dagen belangrijker vindt dan voorkeur. Hier respecteren we shift voorkeur).
+                    // Check voorkeur (respecteer AM/PM voorkeur)
                     $pref = $fixedUser->availability()->where('day_of_week', $dayNameEnglish)->first()->shift_preference ?? 'BOTH';
                     
                     if ($pref == 'BOTH' || $pref == $shift) {
@@ -180,8 +153,6 @@ class ScheduleController extends Controller
                 }
 
                 // STAP 3: AANVULLEN MET OVERIGE MENSEN (Alleen als needed > 0)
-                // Als het Do/Vr is, is needed 0, dus wordt deze stap overgeslagen (behalve vaste mensen hierboven).
-                
                 $currentCount = DB::table('schedules')
                     ->where('date', $currentDate->format('Y-m-d'))
                     ->where('shift_type', $shift)
@@ -198,12 +169,12 @@ class ScheduleController extends Controller
                     ->withCount(['schedules' => function($query) use ($startDate) {
                         $query->whereBetween('date', [$startDate, $startDate->copy()->addDays(6)]);
                     }])
-                    ->get() // Haal ze op om in PHP te filteren (makkelijker met contract_days variabele)
+                    ->get() // Eerst ophalen
                     ->filter(function ($user) {
                         // Alleen mensen die nog dagen 'over' hebben in hun contract
                         return $user->schedules_count < $user->contract_days;
                     })
-                    ->shuffle() // Random volgorde voor eerlijkheid
+                    ->shuffle() // Husselen
                     ->take($slotsToFill);
 
                     foreach($candidates as $candidate) {
@@ -228,8 +199,16 @@ class ScheduleController extends Controller
         return redirect('/nieuwegein/schedule')->with('success', 'Rooster gegenereerd op basis van contracturen en vaste dagen!');
     }
 
+    /**
+     * Wist alle diensten uit de database (reset het rooster).
+     */
+    public function clearSchedule() {
+        DB::table('schedules')->truncate();
+        return redirect('/nieuwegein/admin')->with('success', 'Het volledige rooster is gewist!');
+    }
+
     // ==========================================
-    // 4. CRUD ACTIES (EDIT & DELETE) - HIER TOEGEVOEGD
+    // 4. CRUD ACTIES (EDIT & DELETE)
     // ==========================================
 
     /**
@@ -257,7 +236,8 @@ class ScheduleController extends Controller
             'email' => 'required|email|unique:users,email,'.$user->id,
             'contract_days' => 'required|integer|min:1|max:7',
             'contract_hours' => 'required|integer|min:1',
-            'shift_preference' => 'required'
+            'shift_preference' => 'required',
+            'fixed_days' => 'array'
         ]);
 
         // 2. Update User tabel
@@ -266,6 +246,7 @@ class ScheduleController extends Controller
             'email' => $request->email,
             'contract_days' => $request->contract_days,
             'contract_hours' => $request->contract_hours,
+            'fixed_days' => $request->fixed_days, // Updaten vaste dagen
         ]);
 
         // 3. Update Beschikbaarheid
@@ -284,13 +265,4 @@ class ScheduleController extends Controller
 
         return redirect('/nieuwegein/team')->with('success', 'Collega verwijderd.');
     }
-/**
-     * Wist alle diensten uit de database (reset het rooster).
-     */
-    public function clearSchedule() {
-        // Truncate gooit de hele tabel leeg en reset de ID tellers
-        DB::table('schedules')->truncate();
-
-        return redirect('/nieuwegein/admin')->with('success', 'Het volledige rooster is gewist!');
-    }
-} // <--- DIT IS HET BELANGRIJKE SLUIT-HAAKJE VAN DE CLASS
+}
