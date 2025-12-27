@@ -4,110 +4,49 @@
     <style>
         /* --- ERP / Google Calendar Look Styling --- */
         
-        /* Algemene Kalender Styling */
-        #calendar {
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-        }
+        #calendar { font-family: 'Segoe UI', system-ui, sans-serif; }
 
-        /* Header (Ma/Di/Wo...) */
-        .fc-col-header-cell {
-            background-color: #f8fafc;
-            padding: 8px 0;
-            border-bottom: 1px solid #e2e8f0;
-        }
-        .fc-col-header-cell-cushion {
-            text-decoration: none;
-            color: #475569;
-            font-weight: 600;
-            font-size: 0.8rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
+        /* Header Styling */
+        .fc-col-header-cell { background-color: #f8fafc; padding: 8px 0; border-bottom: 1px solid #e2e8f0; }
+        .fc-col-header-cell-cushion { text-decoration: none; color: #475569; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; }
 
-        /* Dag Cellen */
-        .fc-daygrid-day-number {
-            font-size: 0.85rem;
-            color: #64748b;
-            padding: 4px 8px;
-            text-decoration: none;
-        }
-        .fc-daygrid-day:hover {
-            background-color: #f8fafc;
-        }
-        .fc-day-today {
-            background-color: #fff !important; /* Reset geel naar wit */
-        }
-        .fc-day-today .fc-daygrid-day-number {
-            background-color: #0f6cbd;
-            color: white;
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            margin: 4px;
-        }
+        /* Dagen Styling */
+        .fc-daygrid-day-number { font-size: 0.85rem; color: #64748b; padding: 4px 8px; text-decoration: none; }
+        .fc-daygrid-day:hover { background-color: #f8fafc; }
+        .fc-day-today { background-color: #fff !important; }
+        .fc-day-today .fc-daygrid-day-number { background-color: #0f6cbd; color: white; border-radius: 50%; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; margin: 4px; }
 
-        /* EVENT CHIPS (De Google Look) */
-        .fc-event {
-            border: none !important;
-            border-radius: 3px;
-            font-size: 0.75rem; /* Klein en compact */
-            padding: 1px 4px;
-            margin-bottom: 1px;
-            cursor: pointer;
-            box-shadow: none;
-            line-height: 1.4;
-        }
+        /* Event Chips */
+        .fc-event { border: none !important; border-radius: 3px; font-size: 0.75rem; padding: 1px 4px; margin-bottom: 1px; cursor: pointer; box-shadow: none; line-height: 1.4; }
+        .fc-event-main { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
         
-        /* Zorgt dat tekst niet buiten het blokje valt */
-        .fc-event-main {
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            font-weight: 500;
-        }
-
-        /* De "+2 meer" link */
-        .fc-daygrid-more-link {
-            font-size: 0.7rem;
-            color: #64748b;
-            font-weight: 600;
-            text-decoration: none;
-            padding-left: 4px;
-        }
-        .fc-daygrid-more-link:hover {
-            text-decoration: underline;
-            color: #0f6cbd;
-        }
-
-        /* Popover (als je op +2 meer klikt) */
-        .fc-popover {
-            border: 1px solid #e2e8f0;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-            border-radius: 6px;
-            z-index: 1050; /* Boven alles */
-        }
-        .fc-popover-header {
-            background-color: #f1f5f9;
-            font-weight: 600;
-            font-size: 0.9rem;
-            padding: 8px 12px;
-            color: #334155;
-        }
-        .fc-popover-body {
-            padding: 8px;
-        }
+        /* Links & Popovers */
+        .fc-daygrid-more-link { font-size: 0.7rem; color: #64748b; font-weight: 600; text-decoration: none; padding-left: 4px; }
+        .fc-daygrid-more-link:hover { text-decoration: underline; color: #0f6cbd; }
+        .fc-popover { border: 1px solid #e2e8f0; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); border-radius: 6px; z-index: 1050; }
+        .fc-popover-header { background-color: #f1f5f9; font-weight: 600; font-size: 0.9rem; padding: 8px 12px; color: #334155; }
+        
+        /* Progress Bars */
+        .progress { box-shadow: inset 0 1px 2px rgba(0,0,0,0.05); background-color: #f1f5f9; }
     </style>
 
-    <div class="top-bar">
-        <h5><i class="bi bi-calendar-week me-2"></i>Dashboard</h5>
+    {{-- TOP BAR --}}
+    <div class="top-bar d-flex justify-content-between align-items-center">
         <div class="d-flex align-items-center gap-3">
-            <span class="badge bg-light text-dark border"><i class="bi bi-circle-fill text-primary me-1" style="font-size:0.6rem"></i> Ochtend</span>
-            <span class="badge bg-light text-dark border"><i class="bi bi-circle-fill text-success me-1" style="font-size:0.6rem"></i> Middag</span>
-            <span class="badge bg-light text-dark border"><i class="bi bi-circle-fill me-1" style="font-size:0.6rem; color: #d68100;"></i> Dagdienst</span>
+            <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-calendar-week me-2 text-primary"></i>Dashboard</h5>
+            
+            {{-- Legenda --}}
+            <div class="d-none d-md-flex align-items-center gap-2 ms-4 border-start ps-3">
+                <span class="badge bg-light text-secondary border"><i class="bi bi-circle-fill text-primary me-1" style="font-size:0.5rem"></i> Ochtend</span>
+                <span class="badge bg-light text-secondary border"><i class="bi bi-circle-fill text-success me-1" style="font-size:0.5rem"></i> Middag</span>
+                <span class="badge bg-light text-secondary border"><i class="bi bi-circle-fill me-1" style="font-size:0.5rem; color: #d68100;"></i> Dag</span>
+            </div>
         </div>
+
+        {{-- AUTO SCHEDULE BUTTON (Nieuw) --}}
+        <button type="button" class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#generateModal">
+            <i class="bi bi-magic me-1"></i> Genereer Rooster
+        </button>
     </div>
 
     @if(session('success'))
@@ -120,59 +59,106 @@
     <div class="row g-3 h-100">
         {{-- Linker kolom: Kalender --}}
         <div class="col-lg-9">
-            <div class="erp-card p-0 h-100 shadow-sm">
-                <div class="p-3 bg-white h-100">
+            <div class="erp-card p-0 h-100 shadow-sm border-0">
+                <div class="p-3 bg-white h-100 rounded-2">
                     <div id='calendar'></div>
                 </div>
             </div>
         </div>
 
-        {{-- Rechter kolom: Uren --}}
+        {{-- Rechter kolom: Uren Overzicht (Vernieuwd) --}}
         <div class="col-lg-3">
-            <div class="erp-card h-100 shadow-sm" style="max-height: 800px; overflow-y: auto;">
+            <div class="erp-card h-100 shadow-sm border-0" style="max-height: 800px; overflow-y: auto;">
                 <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
-                    <h6 class="fw-bold text-secondary mb-0">Uren deze week</h6>
-                    <small class="text-muted">Max 40u</small>
+                    <h6 class="fw-bold text-dark mb-0">Uren & Bezetting</h6>
+                    <span class="badge bg-light text-muted border">Week {{ now()->weekOfYear }}</span>
                 </div>
                 
-                <table class="table table-sm table-borderless align-middle" style="font-size: 0.85rem;">
-                    <tbody>
-                        @foreach($stats as $user)
-                        <tr class="border-bottom">
-                            <td class="py-2 ps-0">
-                                <div class="fw-bold text-dark">{{ $user->name }}</div>
-                                <div class="text-muted" style="font-size: 0.75rem;">
-                                    Contract: {{ $user->contract_hours }}u
-                                </div>
-                            </td>
-                            <td class="text-end py-2 pe-0">
-                                @php
-                                    $planned = $user->planned_hours_total;
-                                    $contract = $user->contract_hours;
-                                    $max = 40;
-                                    
-                                    // Logic voor kleur
-                                    $color = 'bg-primary'; 
-                                    if($planned > $contract) $color = 'bg-warning text-dark';
-                                    if($planned >= 38) $color = 'bg-success'; 
-                                    if($planned > 40) $color = 'bg-danger';
+                <div class="vstack gap-3">
+                    @foreach($stats as $user)
+                        @php
+                            $planned = $user->planned_hours_total;
+                            $contract = $user->contract_hours;
+                            $max = 40;
 
-                                    // Percentage voor progress bar (max 40u is 100%)
-                                    $width = min(100, ($planned / 40) * 100);
-                                @endphp
-                                <span class="badge {{ $planned > 40 ? 'bg-danger' : 'bg-light text-dark border' }}">
-                                    {{ $planned }}u
+                            // Bereken percentage voor de balk (max 100% voor visualisatie)
+                            $percent = ($contract > 0) ? ($planned / $contract) * 100 : 0;
+                            // Als ze over contract gaan, bereken t.o.v. 40u of iets meer voor visualisatie
+                            if($planned > $contract) {
+                                $percent = ($planned / 45) * 100; // Schaal iets anders als ze erover zijn
+                            }
+                            if($percent > 100) $percent = 100;
+
+                            // Kleur logica
+                            $barColor = 'bg-primary'; // Standaard blauw
+                            $textColor = 'text-muted';
+                            
+                            if ($planned > $contract) {
+                                $barColor = 'bg-warning'; // Oranje (Let op: over contract)
+                                $textColor = 'text-dark fw-bold';
+                            }
+                            if ($planned > $max) {
+                                $barColor = 'bg-danger'; // Rood (Fout: over 40u)
+                                $textColor = 'text-danger fw-bold';
+                            }
+                        @endphp
+
+                        <div class="p-2 border rounded-1 bg-white">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="fw-bold text-dark" style="font-size: 0.85rem;">{{ $user->name }}</span>
+                                <span class="{{ $textColor }}" style="font-size: 0.75rem;">
+                                    {{ $planned }} / {{ $contract }}u
                                 </span>
-                            </td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                </table>
+                            </div>
+                            
+                            <div class="progress" style="height: 6px;">
+                                <div class="progress-bar {{ $barColor }}" role="progressbar" style="width: {{ $percent }}%" aria-valuenow="{{ $percent }}" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                            
+                            @if($planned > $max)
+                                <div class="text-danger mt-1" style="font-size: 0.65rem;">
+                                    <i class="bi bi-exclamation-triangle-fill"></i> Maximaal 40u overschreden
+                                </div>
+                            @elseif($planned > $contract)
+                                <div class="text-warning mt-1" style="font-size: 0.65rem;">
+                                    <i class="bi bi-info-circle-fill"></i> Over contracturen
+                                </div>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
             </div>
         </div>
     </div>
 
-    {{-- DETAIL MODAL (Voor als je op een dag klikt) --}}
+    {{-- MODAL 1: GENEREER ROOSTER (Nieuw) --}}
+    <div class="modal fade" id="generateModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-sm modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-primary text-white py-2">
+                    <h6 class="modal-title fw-bold"><i class="bi bi-magic me-2"></i>Auto Schedule</h6>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form action="/nieuwegein/schedule/generate" method="POST">
+                    @csrf
+                    <div class="modal-body">
+                        <p class="small text-muted mb-3">Kies de startdatum (week begint op zaterdag).</p>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small">Startdatum</label>
+                            <input type="date" name="start_date" class="form-control form-control-sm" required 
+                                   value="{{ \Carbon\Carbon::now()->next(\Carbon\Carbon::SATURDAY)->format('Y-m-d') }}">
+                        </div>
+                    </div>
+                    <div class="modal-footer py-2 bg-light">
+                        <button type="button" class="btn btn-sm btn-light text-secondary" data-bs-dismiss="modal">Annuleren</button>
+                        <button type="submit" class="btn btn-sm btn-primary">Start Genereren</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {{-- MODAL 2: DETAIL DAG (Bestaand, opgepoetst) --}}
     <div class="modal fade" id="dayDetailsModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-sm">
             <div class="modal-content border-0 shadow-lg rounded-2">
@@ -186,21 +172,18 @@
                     </div>
                     
                     <div id="detailsContent" class="d-none">
-                        {{-- Ochtend --}}
                         <div class="px-3 py-2 bg-light border-bottom d-flex align-items-center">
                             <i class="bi bi-sunrise-fill text-primary me-2"></i>
                             <span class="fw-bold text-secondary" style="font-size:0.75rem">OCHTEND</span>
                         </div>
                         <ul id="listAM" class="list-group list-group-flush mb-0" style="font-size: 0.8rem;"></ul>
 
-                        {{-- Dag --}}
                         <div class="px-3 py-2 bg-light border-bottom border-top d-flex align-items-center">
                             <i class="bi bi-sun-fill text-warning me-2"></i>
                             <span class="fw-bold text-secondary" style="font-size:0.75rem">DAGDIENST</span>
                         </div>
                         <ul id="listDAY" class="list-group list-group-flush mb-0" style="font-size: 0.8rem;"></ul>
 
-                        {{-- Middag --}}
                         <div class="px-3 py-2 bg-light border-bottom border-top d-flex align-items-center">
                             <i class="bi bi-sunset-fill text-success me-2"></i>
                             <span class="fw-bold text-secondary" style="font-size:0.75rem">MIDDAG</span>
@@ -209,7 +192,7 @@
                     </div>
 
                     <div id="noEventsMessage" class="p-4 text-center text-muted small d-none">
-                        Geen planning op deze dag.
+                        Geen planning.
                     </div>
                 </div>
             </div>
@@ -219,16 +202,15 @@
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             var calendarEl = document.getElementById('calendar');
-            var myModal = new bootstrap.Modal(document.getElementById('dayDetailsModal'));
+            var dayDetailsModal = new bootstrap.Modal(document.getElementById('dayDetailsModal'));
 
             var calendar = new FullCalendar.Calendar(calendarEl, {
                 initialView: 'dayGridMonth',
                 locale: 'nl',
-                firstDay: 6, // Zaterdag
+                firstDay: 6, 
                 height: 'auto',
-                contentHeight: 700, // Vaste hoogte voor strakke look
+                contentHeight: 700, 
                 
-                // HEADER CONFIG
                 headerToolbar: {
                     left: 'prev,next today',
                     center: 'title',
@@ -239,44 +221,32 @@
                     month: 'Maand'
                 },
 
-                // GOOGLE CALENDAR LOOK SETTINGS
-                dayMaxEvents: 4, // Toon max 4 regels, daarna "+2 meer"
-                moreLinkClick: 'popover', // Opent een nette popover
-                fixedWeekCount: false, // Geen lege rijen onderaan de maand
-                showNonCurrentDates: false, // Verberg dagen van vorige/volgende maand voor rust
+                dayMaxEvents: 4, 
+                moreLinkClick: 'popover', 
+                fixedWeekCount: false, 
+                showNonCurrentDates: false, 
 
-                // CONTENT FORMAT
-                eventTimeFormat: { 
-                    hour: '2-digit', minute: '2-digit', meridiem: false
-                },
-                
+                eventTimeFormat: { hour: '2-digit', minute: '2-digit', meridiem: false },
                 events: '/nieuwegein/schedule/api',
 
-                // CUSTOM RENDER VOOR DE "CHIP" LOOK
                 eventContent: function(arg) {
                     let timeText = arg.timeText;
                     let title = arg.event.title;
-                    
-                    // We maken de tijd heel subtiel of verbergen hem als de naam lang is
-                    // Hier kiezen we voor: [05:00 Pietje]
                     let html = `<div class="d-flex align-items-center overflow-hidden">`;
                     if(timeText) {
                         html += `<span class="opacity-75 me-1" style="font-size: 0.7em; min-width: 28px;">${timeText}</span>`;
                     }
                     html += `<span class="fw-medium text-truncate">${title}</span>`;
                     html += `</div>`;
-                    
                     return { html: html };
                 },
 
-                // KLIK OP DAG -> OPEN DETAILS
                 dateClick: function(info) {
                     var clickedDate = info.dateStr;
                     var dateObj = new Date(clickedDate);
                     var options = { weekday: 'long', day: 'numeric', month: 'long' };
                     document.getElementById('modalDateTitle').innerText = dateObj.toLocaleDateString('nl-NL', options);
 
-                    // Reset modal
                     document.getElementById('loadingSpinner').classList.remove('d-none');
                     document.getElementById('detailsContent').classList.add('d-none');
                     document.getElementById('noEventsMessage').classList.add('d-none');
@@ -284,26 +254,21 @@
                     document.getElementById('listPM').innerHTML = '';
                     document.getElementById('listDAY').innerHTML = '';
 
-                    myModal.show();
+                    dayDetailsModal.show();
 
                     fetch('/nieuwegein/schedule/day/' + clickedDate)
                         .then(response => response.json())
                         .then(data => {
                             document.getElementById('loadingSpinner').classList.add('d-none');
-                            
                             var hasEvents = false;
                             
-                            // Helper om lijstjes te vullen
                             function fillList(listId, items) {
                                 if (items && items.length > 0) {
                                     hasEvents = true;
                                     items.forEach(item => {
                                         var li = document.createElement('li');
                                         li.className = 'list-group-item d-flex justify-content-between align-items-center px-3 py-2 border-0';
-                                        li.innerHTML = `
-                                            <span class="text-dark">${item.name}</span>
-                                            <span class="badge bg-light text-secondary border fw-normal">${item.time}</span>
-                                        `;
+                                        li.innerHTML = `<span class="text-dark">${item.name}</span><span class="badge bg-light text-secondary border fw-normal">${item.time}</span>`;
                                         document.getElementById(listId).appendChild(li);
                                     });
                                 } else {
@@ -313,7 +278,6 @@
                                     document.getElementById(listId).appendChild(li);
                                 }
                             }
-
                             fillList('listAM', data.AM);
                             fillList('listDAY', data.DAY);
                             fillList('listPM', data.PM);
