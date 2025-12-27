@@ -4,8 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nieuwegein ERP</title>
+    
+    {{-- 1. Bootstrap CSS (zat er al in) --}}
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    {{-- 2. FullCalendar JS (zat er al in) --}}
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
+
+    {{-- 3. NIEUW: Bootstrap JS (Deze ontbrak!) --}}
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
     <style>
         body { background-color: #f4f6f8; font-family: 'Segoe UI', sans-serif; overflow-x: hidden; }
         
