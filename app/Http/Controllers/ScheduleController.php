@@ -313,4 +313,43 @@ class ScheduleController extends Controller
         $user->delete();
         return redirect('/nieuwegein/team')->with('success', 'Collega verwijderd.');
     }
+
+    /**
+     * Haalt details op voor een specifieke datum (voor de pop-up).
+     */
+    public function getDayDetails($date) {
+        $schedules = DB::table('schedules')
+            ->join('users', 'schedules.user_id', '=', 'users.id')
+            ->where('date', $date)
+            ->select('users.name', 'schedules.shift_type', 'users.contract_hours', 'users.contract_days')
+            ->orderBy('users.name')
+            ->get();
+
+        // Groepeer de data zodat we het makkelijk kunnen tonen
+        $grouped = [
+            'AM' => [],
+            'PM' => [],
+            'DAY' => []
+        ];
+
+        foreach($schedules as $row) {
+            // Bereken eindtijd voor weergave
+            $hoursPerShift = ($row->contract_days > 0) ? ($row->contract_hours / $row->contract_days) : 0;
+            
+            if ($row->shift_type == 'AM') {
+                $timeStr = '05:00 - ' . Carbon::parse('05:00')->addHours($hoursPerShift)->format('H:i');
+            } elseif ($row->shift_type == 'PM') {
+                $timeStr = '14:00 - ' . Carbon::parse('14:00')->addHours($hoursPerShift)->format('H:i');
+            } else {
+                $timeStr = '09:00 - 18:00';
+            }
+
+            $grouped[$row->shift_type][] = [
+                'name' => $row->name,
+                'time' => $timeStr
+            ];
+        }
+
+        return response()->json($grouped);
+    }
 }

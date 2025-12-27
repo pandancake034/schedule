@@ -24,3 +24,10 @@ Route::post('/nieuwegein/admin/generate', [ScheduleController::class, 'generateS
 
 // Route om het rooster te wissen
 Route::post('/nieuwegein/admin/clear', [ScheduleController::class, 'clearSchedule']);
+
+// ...
+Route::get('/nieuwegein/schedule/api', [ScheduleController::class, 'getEvents']);
+
+// NIEUW: Detail route voor dagoverzicht
+Route::get('/nieuwegein/schedule/day/{date}', [ScheduleController::class, 'getDayDetails']);
+// ...
