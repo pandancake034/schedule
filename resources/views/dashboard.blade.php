@@ -130,8 +130,7 @@
             </div>
         </div>
     </div>
-
-    {{-- MODAL 1: GENEREER ROOSTER (Nieuw) --}}
+{{-- MODAL 1: GENEREER ROOSTER (Aangepast met Periode Keuze) --}}
     <div class="modal fade" id="generateModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-sm modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg">
@@ -142,11 +141,23 @@
                 <form action="/nieuwegein/schedule/generate" method="POST">
                     @csrf
                     <div class="modal-body">
-                        <p class="small text-muted mb-3">Kies de startdatum (week begint op zaterdag).</p>
+                        <p class="small text-muted mb-3">Kies de startdatum en hoe ver vooruit je wilt plannen.</p>
+                        
                         <div class="mb-3">
                             <label class="form-label fw-bold small">Startdatum</label>
                             <input type="date" name="start_date" class="form-control form-control-sm" required 
                                    value="{{ \Carbon\Carbon::now()->next(\Carbon\Carbon::SATURDAY)->format('Y-m-d') }}">
+                            <div class="form-text" style="font-size: 0.7rem;">Begint altijd op de dichtstbijzijnde zaterdag.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small">Periode</label>
+                            <select name="duration" class="form-select form-select-sm">
+                                <option value="1_week">1 Week</option>
+                                <option value="3_months" selected>3 Maanden</option>
+                                <option value="6_months">6 Maanden</option>
+                                <option value="12_months">12 Maanden (1 Jaar)</option>
+                            </select>
                         </div>
                     </div>
                     <div class="modal-footer py-2 bg-light">
