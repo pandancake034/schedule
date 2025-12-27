@@ -165,8 +165,6 @@ class ScheduleController extends Controller
         // ---------------------------------------------------------
         // FASE 1: Eerst ALLE vaste dagen inplannen voor de hele week
         // ---------------------------------------------------------
-        // Dit doen we eerst, zodat we in Fase 2 precies weten wie er 
-        // nog uren 'over' heeft.
         for ($i = 0; $i < 7; $i++) {
             $currentDate = $startDate->copy()->addDays($i);
             $dayName = $currentDate->format('l');
@@ -183,8 +181,6 @@ class ScheduleController extends Controller
         // ---------------------------------------------------------
         // FASE 2: Gaten opvullen (Za t/m Wo)
         // ---------------------------------------------------------
-        // Hier kijken we wie er nog uren moet maken en vullen we aan.
-        // Do/Vr slaan we hier over (want daar wilden we alleen vaste mensen).
         for ($i = 0; $i < 7; $i++) {
             $currentDate = $startDate->copy()->addDays($i);
             $dayName = $currentDate->format('l');
@@ -199,7 +195,7 @@ class ScheduleController extends Controller
             }
         }
 
-        return redirect('/nieuwegein/schedule')->with('success', 'Rooster gegenereerd: Iedereen komt aan zijn uren!');
+        return redirect('/nieuwegein/schedule')->with('success', 'Rooster gegenereerd: Prioriteit op vullen (max 40u)!');
     }
 
     /**
@@ -235,7 +231,7 @@ class ScheduleController extends Controller
                 }
             }
 
-            // Plan in (isFixed=true: forceer ook als uren licht overschreden worden, want vaste dag is heilig)
+            // Plan in (isFixed=true: forceer ook als uren licht overschreden worden)
             if ($this->canWorkShift($user, $date, $targetShift, $weekStart, $weekEnd, true)) {
                 $this->assignShift($date, $targetShift, $user->id);
             }
@@ -243,7 +239,7 @@ class ScheduleController extends Controller
     }
 
     /**
-     * FASE 2: Gaten vullen op basis van benodigde uren.
+     * FASE 2: Gaten vullen (Prioriteit: Contract halen -> Overuren maken).
      */
     private function fillShiftGaps($date, $shiftType, $weekStart, $weekEnd)
     {
@@ -255,7 +251,7 @@ class ScheduleController extends Controller
             $targetPerShift = 1;
         }
 
-        // Check huidige bezetting (inclusief vaste mensen uit Fase 1)
+        // Check huidige bezetting
         $currentCount = DB::table('schedules')
             ->where('date', $date->format('Y-m-d'))
             ->where('shift_type', $shiftType)
@@ -264,7 +260,7 @@ class ScheduleController extends Controller
         $needed = $targetPerShift - $currentCount;
         if ($needed <= 0) return;
 
-        // 1. Haal alle beschikbare kandidaten op
+        // 1. Haal kandidaten op
         $candidates = User::whereHas('availability', function($q) use ($dayName, $shiftType) {
             $q->where('day_of_week', $dayName);
             if ($shiftType !== 'DAY') {
@@ -272,28 +268,24 @@ class ScheduleController extends Controller
             }
         })->get();
 
-        // 2. BEREKEN PRIORITEIT (Wie heeft de uren het hardst nodig?)
-        // We voegen een 'hours_needed' property toe aan de users collectie
+        // 2. BEREKEN PRIORITEIT
         $candidates = $candidates->map(function($user) use ($weekStart, $weekEnd) {
-            // Tel geplande uren in deze week
             $planned = $this->calculateWeeklyHours($user, $weekStart, $weekEnd);
-            
-            // Hoeveel uur heeft hij nog 'te goed' volgens contract?
+            // Uren die nog "moeten" volgens contract
             $user->hours_remaining = $user->contract_hours - $planned;
-            
             return $user;
         });
 
-        // 3. Sorteer: Mensen met de meeste overgebleven uren bovenaan
+        // 3. Sorteer: Mensen met meeste 'te goed' uren bovenaan
+        // Mensen met overuren (negatieve remaining) komen onderaan, maar worden WEL meegenomen.
         $candidates = $candidates->sortByDesc('hours_remaining');
 
         // 4. Vul de gaten
         foreach ($candidates as $candidate) {
             if ($needed <= 0) break;
 
-            // Als iemand zijn uren al vol heeft (hours_remaining <= 0), 
-            // stoppen we met deze persoon (tenzij er echt niemand anders is, maar canWorkShift blokkeert dit)
-            if ($candidate->hours_remaining <= 0) continue;
+            // We hebben de check 'hours_remaining <= 0' verwijderd.
+            // Iedereen mag werken, zolang canWorkShift (40u limiet) het toestaat.
 
             if ($this->canWorkShift($candidate, $date, $shiftType, $weekStart, $weekEnd)) {
                 $this->assignShift($date, $shiftType, $candidate->id);
@@ -304,41 +296,39 @@ class ScheduleController extends Controller
 
     /**
      * Centrale controle: Mag deze persoon werken?
-     * Nu met Vooruit & Achteruit rusttijd check.
+     * Nu met max 40 uur limiet (i.p.v. strikt contract).
      */
     private function canWorkShift($user, $date, $shiftType, $weekStart, $weekEnd, $isFixed = false)
     {
         // 1. Dubbele shift check
         if ($this->userHasShiftToday($user->id, $date)) return false; 
 
-        // 2. RUSTTIJDEN (Cruciaal)
+        // 2. RUSTTIJDEN
         // A. Achteruit: Gisteren PM -> Vandaag AM mag NIET.
         if ($shiftType === 'AM' && $this->workedLateYesterday($user->id, $date)) {
             return false;
         }
         // B. Vooruit: Vandaag PM -> Morgen AM mag NIET.
-        // Omdat we in Fase 2 zitten, kan 'morgen' al ingepland zijn door Fase 1 (vaste dag).
         if ($shiftType === 'PM' && $this->worksEarlyTomorrow($user->id, $date)) {
             return false;
         }
 
-        // 3. Contract Checks
-        // Als het een vaste dag is ($isFixed=true), negeren we de max-uren limiet
-        // omdat de vaste dag contractueel is vastgelegd.
+        // 3. Contract & Limieten
         if (!$isFixed) {
             $shiftsThisWeek = DB::table('schedules')
                 ->where('user_id', $user->id)
                 ->whereBetween('date', [$weekStart->format('Y-m-d'), $weekEnd->format('Y-m-d')])
-                ->count(); // Aantal dagen
+                ->count(); 
 
             $plannedHours = $this->calculateWeeklyHours($user, $weekStart, $weekEnd);
             $newShiftHours = ($shiftType === 'DAY') ? 9 : (($user->contract_days > 0) ? ($user->contract_hours / $user->contract_days) : 0);
 
-            // Check Max Dagen
-            if ($shiftsThisWeek >= $user->contract_days) return false;
+            // AANPASSING: Maximaal 6 dagen werken per week als overwerk
+            if ($shiftsThisWeek >= 6) return false;
 
-            // Check Max Uren (Mag niet over contract heen)
-            if (($plannedHours + $newShiftHours) > $user->contract_hours) return false;
+            // AANPASSING: Maximaal 40 uur per week (Harde limiet voor iedereen)
+            // Dus ook als je contract 24 uur is, mag je tot 40 uur werken om gaten te vullen.
+            if (($plannedHours + $newShiftHours) > 40) return false;
         }
 
         return true;
