@@ -3,31 +3,27 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ScheduleController;
 
-// 1. Dashboard
+// 1. Dashboard & Kalender
 Route::get('/nieuwegein/schedule', [ScheduleController::class, 'index']);
 Route::get('/nieuwegein/schedule/api', [ScheduleController::class, 'getEvents']);
+Route::get('/nieuwegein/schedule/day/{date}', [ScheduleController::class, 'getDayDetails']); // Detail pop-up
 
-// 2. Team
+// 2. Acties (Genereren & Wissen)
+// Deze regel zorgt dat de knop 'Genereer Rooster' werkt:
+Route::post('/nieuwegein/schedule/generate', [ScheduleController::class, 'generateSchedule']);
+Route::post('/nieuwegein/admin/clear', [ScheduleController::class, 'clearSchedule']);
+
+// 3. Team Beheer
 Route::get('/nieuwegein/team', [ScheduleController::class, 'team']);
-Route::get('/nieuwegein/team/{id}/edit', [ScheduleController::class, 'editUser']); // Formulier tonen
-Route::put('/nieuwegein/team/{id}', [ScheduleController::class, 'updateUser']);   // Opslaan
-Route::delete('/nieuwegein/team/{id}', [ScheduleController::class, 'deleteUser']); // Verwijderen
+Route::get('/nieuwegein/team/{id}/edit', [ScheduleController::class, 'editUser']); 
+Route::put('/nieuwegein/team/{id}', [ScheduleController::class, 'updateUser']);   
+Route::delete('/nieuwegein/team/{id}', [ScheduleController::class, 'deleteUser']); 
 
-// ... bestaande code ...
-
-// 3. Admin
+// 4. Admin (Aanmaken gebruikers)
 Route::get('/nieuwegein/admin', [ScheduleController::class, 'admin']);
 Route::post('/nieuwegein/admin/create-user', [ScheduleController::class, 'storeUser']);
 
-// De route die het algoritme start
-Route::post('/nieuwegein/admin/generate', [ScheduleController::class, 'generateSchedule']);
-
-// Route om het rooster te wissen
-Route::post('/nieuwegein/admin/clear', [ScheduleController::class, 'clearSchedule']);
-
-// ...
-Route::get('/nieuwegein/schedule/api', [ScheduleController::class, 'getEvents']);
-
-// NIEUW: Detail route voor dagoverzicht
-Route::get('/nieuwegein/schedule/day/{date}', [ScheduleController::class, 'getDayDetails']);
-// ...
+// Root redirect (optioneel, handig als je de app opent)
+Route::get('/', function () {
+    return redirect('/nieuwegein/schedule');
+});
