@@ -1,6 +1,24 @@
 @extends('layout')
 
 @section('content')
+    <style>
+        /* CSS om te zorgen dat de tekst in de kalender niet wordt afgekapt */
+        .fc-event-title {
+            white-space: normal !important; /* Tekst mag naar volgende regel */
+            font-size: 0.85em;
+            line-height: 1.2;
+        }
+        .fc-event-time {
+            font-weight: bold;
+            display: block; /* Tijd op eigen regel */
+            margin-bottom: 2px;
+        }
+        /* Zorgt dat events wat meer ruimte krijgen */
+        .fc-daygrid-event {
+            padding: 4px;
+        }
+    </style>
+
     <div class="top-bar">
         <h5 class="m-0 fw-bold text-secondary">Dashboard / Rooster</h5>
     </div>
@@ -13,14 +31,14 @@
         {{-- Linker kolom: Kalender --}}
         <div class="col-md-8">
             <div class="erp-card">
-                <div id='calendar' style="max-height: 700px; font-size: 0.85rem;"></div>
+                <div id='calendar' style="min-height: 700px;"></div>
             </div>
         </div>
 
         {{-- Rechter kolom: Uren Overzicht --}}
         <div class="col-md-4">
             <div class="erp-card">
-                <h6 class="fw-bold mb-3">Urenstand (Deze Maand)</h6>
+                <h6 class="fw-bold mb-3">Totaal gepland (Alle tijden)</h6>
                 <div class="table-responsive">
                     <table class="table table-sm table-bordered">
                         <thead class="table-light">
@@ -28,34 +46,23 @@
                                 <th>Naam</th>
                                 <th>Contract</th>
                                 <th>Gepland</th>
-                                <th>Status</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach($stats as $user)
-                                @php
-                                    // Bereken maandtarget (contract per week * 4)
-                                    $monthlyTarget = $user->contract_hours * 4;
-                                @endphp
                                 <tr>
                                     <td>{{ $user->name }}</td>
-                                    <td><small class="text-muted">{{ $user->contract_hours }}u/w</small></td>
-                                    <td class="fw-bold {{ $user->worked_hours > $monthlyTarget ? 'text-danger' : 'text-success' }}">
-                                        {{ $user->worked_hours }}u
-                                    </td>
-                                    <td>
-                                        @if($user->worked_hours >= $monthlyTarget)
-                                            <span class="badge bg-success">Compleet</span>
-                                        @else
-                                            <span class="badge bg-warning text-dark">Open</span>
-                                        @endif
+                                    <td><small class="text-muted">{{ $user->contract_hours }}u p/w</small></td>
+                                    <td class="fw-bold">
+                                        {{-- Weergeeft het totaal berekend in de controller --}}
+                                        {{ $user->planned_hours_total ?? 0 }} u
                                     </td>
                                 </tr>
                             @endforeach
                         </tbody>
                     </table>
                 </div>
-                <small class="text-muted fst-italic">Gebaseerd op contracturen per dag.</small>
+                <small class="text-muted fst-italic">Totaal van alle ingeplande diensten in de database.</small>
             </div>
         </div>
     </div>
@@ -66,19 +73,27 @@
             var calendar = new FullCalendar.Calendar(calendarEl, {
                 initialView: 'dayGridMonth',
                 locale: 'nl',
-                height: 600,
+                
+                // ZATERDAG ALS EERSTE DAG (0=Zondag, 1=Maandag, ..., 6=Zaterdag)
+                firstDay: 6, 
+                
+                height: 'auto', // Hoogte past zich aan de inhoud aan
                 headerToolbar: {
                     left: 'prev,next today',
                     center: 'title',
                     right: 'dayGridMonth,timeGridWeek'
                 },
-                // Zorg dat de tijden goed worden getoond
+                
+                // Formaat van de tijden in de blokjes (bijv. 09:00 - 18:00)
                 eventTimeFormat: { 
                     hour: '2-digit', 
                     minute: '2-digit', 
-                    meridiem: false 
+                    meridiem: false,
+                    hour12: false
                 },
                 displayEventEnd: true, // Laat ook de eindtijd zien
+                
+                // Haal de events op uit onze API
                 events: '/nieuwegein/schedule/api' 
             });
             calendar.render();
