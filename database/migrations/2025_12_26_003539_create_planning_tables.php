@@ -12,8 +12,9 @@ return new class extends Migration
         Schema::create('availabilities', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->string('day_of_week'); // Monday, Tuesday etc.
-            $table->enum('shift_preference', ['AM', 'PM', 'BOTH']);
+            $table->string('day_of_week'); 
+            // Hier voegen we 'DAY' toe voor mensen die vast op do/vr werken
+            $table->enum('shift_preference', ['AM', 'PM', 'BOTH', 'DAY']);
             $table->timestamps();
         });
 
@@ -21,9 +22,10 @@ return new class extends Migration
         Schema::create('schedules', function (Blueprint $table) {
             $table->id();
             $table->date('date');
-            $table->enum('shift_type', ['AM', 'PM']);
+            // Hier voegen we 'DAY' toe zodat de database dit accepteert
+            $table->enum('shift_type', ['AM', 'PM', 'DAY']);
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->unique(['date', 'shift_type', 'user_id']); // Geen dubbele diensten
+            $table->unique(['date', 'shift_type', 'user_id']); 
             $table->timestamps();
         });
     }
