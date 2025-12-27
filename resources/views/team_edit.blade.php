@@ -54,6 +54,19 @@
                         <div class="form-text">Let op: Dit werkt de voorkeur bij voor alle dagen van de week.</div>
                     </div>
 
+                    <div class="mb-3">
+                        <label class="fw-bold">Vaste Werkdagen</label>
+                        <div class="d-flex flex-wrap gap-3">
+                            @foreach(['Monday'=>'Ma', 'Tuesday'=>'Di', 'Wednesday'=>'Wo', 'Thursday'=>'Do', 'Friday'=>'Vr', 'Saturday'=>'Za', 'Sunday'=>'Zo'] as $eng => $nl)
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="fixed_days[]" value="{{ $eng }}" id="fd_edit_{{ $eng }}"
+                                        {{ in_array($eng, $user->fixed_days ?? []) ? 'checked' : '' }}>
+                                    <label class="form-check-label" for="fd_edit_{{ $eng }}">{{ $nl }}</label>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+
                     <div class="d-flex justify-content-between">
                         <button type="submit" class="btn btn-success">💾 Wijzigingen Opslaan</button>
                     </div>

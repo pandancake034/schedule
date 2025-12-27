@@ -73,84 +73,139 @@ class ScheduleController extends Controller
      * Maakt een nieuwe gebruiker aan + stelt basis beschikbaarheid in.
      */
     public function storeUser(Request $request) {
-        // 1. Validatie
         $request->validate([
             'name' => 'required', 
             'email' => 'required|email|unique:users,email',
             'contract_days' => 'required|integer|min:1|max:7',
             'contract_hours' => 'required|integer|min:1',
-            'shift_preference' => 'required' 
+            'shift_preference' => 'required',
+            'fixed_days' => 'array' // Mag leeg zijn, maar moet array zijn
         ]);
         
-        // 2. Maak de gebruiker aan
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'contract_days' => $request->contract_days,
             'contract_hours' => $request->contract_hours,
+            'fixed_days' => $request->fixed_days, // Opslaan van vaste dagen
             'password' => bcrypt('welkom123')
         ]);
 
-        // 3. Maak beschikbaarheid aan
         $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-        
         foreach($days as $day) {
             DB::table('availabilities')->insert([
                 'user_id' => $user->id,
                 'day_of_week' => $day,
                 'shift_preference' => $request->shift_preference,
-                'created_at' => now(),
-                'updated_at' => now()
+                'created_at' => now(), 'updated_at' => now()
             ]);
         }
 
         return redirect('/nieuwegein/team')->with('success', 'Collega ' . $user->name . ' succesvol toegevoegd!');
     }
 
+    public function updateUser(Request $request, $id) {
+        $user = User::findOrFail($id);
+
+        $request->validate([
+            'name' => 'required',
+            'email' => 'required|email|unique:users,email,'.$user->id,
+            'contract_days' => 'required|integer|min:1|max:7',
+            'contract_hours' => 'required|integer|min:1',
+            'shift_preference' => 'required',
+            'fixed_days' => 'array'
+        ]);
+
+        $user->update([
+            'name' => $request->name,
+            'email' => $request->email,
+            'contract_days' => $request->contract_days,
+            'contract_hours' => $request->contract_hours,
+            'fixed_days' => $request->fixed_days, // Updaten
+        ]);
+
+        Availability::where('user_id', $user->id)
+            ->update(['shift_preference' => $request->shift_preference]);
+
+        return redirect('/nieuwegein/team')->with('success', 'Gegevens bijgewerkt!');
+    }
+
     /**
-     * HET ALGORITME: Vult het rooster automatisch.
+     * HET VERNIEUWDE ALGORITME
      */
     public function generateSchedule(Request $request) {
         $startDate = Carbon::parse($request->start_date);
         
-        // Loop door de komende 7 dagen
+        // Loop 7 dagen
         for ($i = 0; $i < 7; $i++) {
             $currentDate = $startDate->copy()->addDays($i);
             $dayNameEnglish = $currentDate->format('l'); 
 
-            // REGEL 1: BEZETTING BEPALEN
+            // STAP 1: BEZETTING BEPALEN
+            // Do & Vr = GEEN bezorgdagen (dus doel is 0), tenzij vaste mensen.
+            // Overige dagen = 2 personen per shift.
             if ($dayNameEnglish == 'Thursday' || $dayNameEnglish == 'Friday') {
-                $neededPerShift = 1;
+                $neededPerShift = 0; 
             } else {
                 $neededPerShift = 2;
             }
 
             foreach(['AM', 'PM'] as $shift) {
-                // 1. Tel huidige bezetting
+                
+                // STAP 2: EERST DE "VASTE DAGEN" MENSEN INPLANNEN
+                // We zoeken iedereen die deze dag als vaste dag heeft
+                $fixedUsers = User::whereJsonContains('fixed_days', $dayNameEnglish)->get();
+
+                foreach($fixedUsers as $fixedUser) {
+                    // Check voorkeur (als iemand 'Alleen Ochtend' wil, plannen we hem niet 's middags, 
+                    // tenzij je vaste dagen belangrijker vindt dan voorkeur. Hier respecteren we shift voorkeur).
+                    $pref = $fixedUser->availability()->where('day_of_week', $dayNameEnglish)->first()->shift_preference ?? 'BOTH';
+                    
+                    if ($pref == 'BOTH' || $pref == $shift) {
+                        // Check dubbel
+                        $exists = DB::table('schedules')
+                            ->where('user_id', $fixedUser->id)
+                            ->where('date', $currentDate->format('Y-m-d'))
+                            ->exists();
+                        
+                        if (!$exists) {
+                            DB::table('schedules')->insert([
+                                'date' => $currentDate->format('Y-m-d'),
+                                'shift_type' => $shift,
+                                'user_id' => $fixedUser->id,
+                                'created_at' => now(), 'updated_at' => now()
+                            ]);
+                        }
+                    }
+                }
+
+                // STAP 3: AANVULLEN MET OVERIGE MENSEN (Alleen als needed > 0)
+                // Als het Do/Vr is, is needed 0, dus wordt deze stap overgeslagen (behalve vaste mensen hierboven).
+                
                 $currentCount = DB::table('schedules')
                     ->where('date', $currentDate->format('Y-m-d'))
                     ->where('shift_type', $shift)
                     ->count();
 
-                // 2. Plekken over?
                 $slotsToFill = $neededPerShift - $currentCount;
 
                 if ($slotsToFill > 0) {
-                    // 3. Zoek kandidaten
                     $candidates = User::whereHas('availability', function($query) use ($dayNameEnglish, $shift) {
                         $query->where('day_of_week', $dayNameEnglish)
                               ->whereIn('shift_preference', [$shift, 'BOTH']);
                     })
-                    // REGEL 2: Max 5 dagen
+                    // REGEL: Check of ze hun CONTRACT DAGEN nog niet bereikt hebben in deze week
                     ->withCount(['schedules' => function($query) use ($startDate) {
                         $query->whereBetween('date', [$startDate, $startDate->copy()->addDays(6)]);
                     }])
-                    ->having('schedules_count', '<', 5) 
-                    ->inRandomOrder()
-                    ->take($slotsToFill)
-                    ->get();
+                    ->get() // Haal ze op om in PHP te filteren (makkelijker met contract_days variabele)
+                    ->filter(function ($user) {
+                        // Alleen mensen die nog dagen 'over' hebben in hun contract
+                        return $user->schedules_count < $user->contract_days;
+                    })
+                    ->shuffle() // Random volgorde voor eerlijkheid
+                    ->take($slotsToFill);
 
-                    // 4. Inplannen
                     foreach($candidates as $candidate) {
                         $alreadyWorkingToday = DB::table('schedules')
                             ->where('user_id', $candidate->id)
@@ -162,8 +217,7 @@ class ScheduleController extends Controller
                                 'date' => $currentDate->format('Y-m-d'),
                                 'shift_type' => $shift,
                                 'user_id' => $candidate->id,
-                                'created_at' => now(),
-                                'updated_at' => now()
+                                'created_at' => now(), 'updated_at' => now()
                             ]);
                         }
                     }
@@ -171,7 +225,7 @@ class ScheduleController extends Controller
             }
         }
 
-        return redirect('/nieuwegein/schedule')->with('success', 'Rooster succesvol gegenereerd!');
+        return redirect('/nieuwegein/schedule')->with('success', 'Rooster gegenereerd op basis van contracturen en vaste dagen!');
     }
 
     // ==========================================

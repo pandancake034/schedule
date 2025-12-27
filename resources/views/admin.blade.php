@@ -42,7 +42,18 @@
                 <input type="number" name="contract_hours" class="form-control" value="40" min="1" required>
             </div>
         </div>
-
+           <div class="mb-3">
+            <label class="fw-bold">Vaste Werkdagen (Verplicht werken)</label>
+            <div class="d-flex flex-wrap gap-3">
+                @foreach(['Monday'=>'Ma', 'Tuesday'=>'Di', 'Wednesday'=>'Wo', 'Thursday'=>'Do', 'Friday'=>'Vr', 'Saturday'=>'Za', 'Sunday'=>'Zo'] as $eng => $nl)
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="fixed_days[]" value="{{ $eng }}" id="fd_{{ $eng }}">
+                        <label class="form-check-label" for="fd_{{ $eng }}">{{ $nl }}</label>
+                    </div>
+                @endforeach
+            </div>
+            <small class="text-muted">Iemand met een vaste dag wordt ALTIJD ingepland op deze dag.</small>
+        </div>
         <div class="mb-3">
             <label>Beschikbaarheid Voorkeur</label>
             <select name="shift_preference" class="form-control">

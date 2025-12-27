@@ -23,6 +23,7 @@ class User extends Authenticatable
         'email',
         'password',
         'contract_days',  // <--- Nieuw
+        'fixed_days', // <--- Toevoegen
         'contract_hours', // <--- Nieuw
     ];
 
@@ -46,6 +47,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'fixed_days' => 'array', // <--- Zorgt dat het automatisch een array wordt
         ];
     }
 
