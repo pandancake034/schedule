@@ -70,16 +70,16 @@
 
         <div class="col-md-6">
     <div class="erp-card">
-        <h5 class="mb-3">Automatische Planning</h5>
-        <p>Regels: Za-Wo (2 pers), Do-Vr (1 pers). Max 5 dagen werken.</p>
+    <h5 class="mb-3">Automatische Planning</h5>
+        <p>Regels: Za-Wo (2 pers), Do-Vr (1 pers).<br>Week begint op Zaterdag.</p>
         
         <form action="/nieuwegein/admin/generate" method="POST">
             @csrf
             <div class="mb-3">
-                <label>Startdatum (Maandag)</label>
-                <input type="date" name="start_date" class="form-control" value="{{ date('Y-m-d', strtotime('next monday')) }}" required>
+                <label>Startdatum (Zaterdag)</label>
+                <input type="date" name="start_date" class="form-control" value="{{ date('Y-m-d', strtotime('next saturday')) }}" required>
             </div>
-            <button type="submit" class="btn btn-primary w-100">🚀 Genereer Rooster</button>
+            <button type="submit" class="btn btn-primary w-100 mb-3">🚀 Genereer Rooster</button>
         </form>
         {{-- Nieuwe Wis-knop --}}
         <form action="/nieuwegein/admin/clear" method="POST" onsubmit="return confirm('Weet je zeker dat je het HELE rooster wilt wissen? Dit kan niet ongedaan worden gemaakt!');">
