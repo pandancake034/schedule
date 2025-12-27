@@ -15,27 +15,19 @@ class ScheduleController extends Controller
     // ==========================================
 
     public function index() {
-        // We halen gebruikers op en tellen hun shifts
-        // We kijken naar ALLE toekomstige en huidige shifts om de teller te vullen
         $users = User::with('schedules')->get();
 
-        // Bereken gewerkte uren
         $users->map(function($user) {
             $totalHours = 0;
+            // Schatting gemiddelde duur per shift (contract uren / dagen)
+            $avgShiftDuration = ($user->contract_days > 0) ? ($user->contract_hours / $user->contract_days) : 0;
 
             foreach($user->schedules as $schedule) {
-                if ($schedule->shift_type === 'DAY') {
-                    // Donderdag/Vrijdag dienst is altijd 9 uur (09:00 - 18:00)
-                    $totalHours += 9;
-                } else {
-                    // AM/PM dienst: Uren = Contract Uren / Contract Dagen
-                    // Bijv: 32 uur / 4 dagen = 8 uur per shift
-                    $hoursPerShift = ($user->contract_days > 0) ? ($user->contract_hours / $user->contract_days) : 0;
-                    $totalHours += $hoursPerShift;
-                }
+                // Voor de statistieken tellen we het gemiddelde per shift
+                $totalHours += $avgShiftDuration;
             }
             
-            $user->planned_hours_total = $totalHours;
+            $user->planned_hours_total = round($totalHours, 1);
             return $user;
         });
 
@@ -62,42 +54,65 @@ class ScheduleController extends Controller
             ->get();
 
         $events = $schedules->map(function($row) {
-            // Kleuren: Ochtend=Blauw, Middag=Groen, Dagdienst=Oranje
-            if ($row->shift_type == 'AM') $color = '#0070d2';
-            elseif ($row->shift_type == 'PM') $color = '#04844b';
-            else $color = '#d68100'; // DAY shift
+            // Kleuren
+            if ($row->shift_type == 'AM') $color = '#0070d2'; // Blauw
+            elseif ($row->shift_type == 'PM') $color = '#04844b'; // Groen
+            else $color = '#d68100'; // Oranje (Dagdienst)
 
-            // Bereken uren voor AM/PM
-            $hoursPerDay = ($row->contract_days > 0) ? ($row->contract_hours / $row->contract_days) : 0;
+            // Tijden berekenen
+            $times = $this->calculateShiftTimes($row->date, $row->shift_type, $row->contract_hours, $row->contract_days);
 
-            $date = $row->date;
-            
-            if ($row->shift_type == 'DAY') {
-                // Donderdag/Vrijdag: 09:00 - 18:00
-                $start = Carbon::parse("$date 09:00:00");
-                $end   = Carbon::parse("$date 18:00:00");
-                $title = $row->name . ' (Dag)';
-            } elseif ($row->shift_type == 'AM') {
-                // AM: Start 05:00
-                $start = Carbon::parse("$date 05:00:00");
-                $end   = $start->copy()->addHours($hoursPerDay);
-                $title = $row->name . ' (Ochtend)';
-            } else {
-                // PM: Start 14:00
-                $start = Carbon::parse("$date 14:00:00");
-                $end   = $start->copy()->addHours($hoursPerDay);
-                $title = $row->name . ' (Middag)';
-            }
+            $typeLabel = match($row->shift_type) {
+                'AM' => '(Ochtend)',
+                'PM' => '(Middag)',
+                'DAY' => '(Dag)',
+                default => ''
+            };
 
             return [
-                'title' => $title,
-                'start' => $start->toIso8601String(),
-                'end'   => $end->toIso8601String(),
+                'title' => $row->name . ' ' . $typeLabel,
+                'start' => $times['start'],
+                'end'   => $times['end'],
                 'color' => $color
             ];
         });
 
         return response()->json($events);
+    }
+
+    /**
+     * Helper om start- en eindtijden te berekenen voor weergave.
+     */
+    private function calculateShiftTimes($dateStr, $shiftType, $contractHours, $contractDays) {
+        $date = Carbon::parse($dateStr);
+        $avgDuration = ($contractDays > 0) ? ($contractHours / $contractDays) : 8;
+
+        $startTime = '00:00';
+
+        if ($shiftType === 'DAY') {
+            // Donderdag/Vrijdag dagdienst begint om 09:00
+            $startTime = '09:00';
+        } elseif ($shiftType === 'PM') {
+            // Middagdienst begint om 14:00
+            $startTime = '14:00';
+        } else {
+            // AM Shift
+            if ($date->dayOfWeek === Carbon::SUNDAY) {
+                // Zondag begint om 06:00
+                $startTime = '06:00';
+            } else {
+                // Andere dagen 05:00
+                $startTime = '05:00';
+            }
+        }
+
+        $start = Carbon::parse("$dateStr $startTime:00");
+        $end = $start->copy()->addMinutes($avgDuration * 60);
+
+        return [
+            'start' => $start->toIso8601String(),
+            'end'   => $end->toIso8601String()
+        ];
     }
 
     // ==========================================
@@ -142,40 +157,48 @@ class ScheduleController extends Controller
 
     public function generateSchedule(Request $request)
     {
-        // 1. Bepaal de weekrange (Start moet op Zaterdag vallen)
+        // 1. Weekrange bepalen (Start op Zaterdag)
         $startDate = Carbon::parse($request->start_date);
         
         if ($startDate->dayOfWeek !== Carbon::SATURDAY) {
-            // Zorg dat we altijd met de zaterdag van die week beginnen
             $startDate->previous(Carbon::SATURDAY); 
         }
 
         $weekStart = $startDate->copy();
         $weekEnd   = $startDate->copy()->addDays(6);
 
-        // 2. Loop door elke dag van de week (Za t/m Vr)
+        // 2. Loop door de week
         for ($i = 0; $i < 7; $i++) {
             $currentDate = $startDate->copy()->addDays($i);
-            $dayName = $currentDate->format('l'); // Bijv. 'Monday'
+            $dayName = $currentDate->format('l'); // Bijv. 'Thursday'
 
-            // Bepaal welke shifts er vandaag zijn
-            // Do & Vr: alleen DAG (DAY). Andere dagen: AM & PM.
+            // --- Logica Splitsing ---
+            
             if ($dayName === 'Thursday' || $dayName === 'Friday') {
-                $shiftsToCheck = ['DAY'];
+                // REGEL: Donderdag & Vrijdag
+                // - Alleen 'DAY' shift.
+                // - Alleen VASTE medewerkers (geen opvulling tot 2).
+                
+                $this->scheduleFixedUsers($currentDate, ['DAY'], $weekStart, $weekEnd);
+                
             } else {
+                // REGEL: Andere dagen (Zaterdag t/m Woensdag)
+                // - AM & PM shifts.
+                // - Wel opvullen tot 2 personen.
+                
                 $shiftsToCheck = ['AM', 'PM'];
-            }
+                
+                // Stap A: Eerst vaste mensen
+                $this->scheduleFixedUsers($currentDate, $shiftsToCheck, $weekStart, $weekEnd);
 
-            // STAP A: Vaste medewerkers inplannen (Prioriteit)
-            $this->scheduleFixedUsers($currentDate, $shiftsToCheck, $weekStart, $weekEnd);
-
-            // STAP B: Rooster opvullen tot 2 personen per shift
-            foreach ($shiftsToCheck as $shiftType) {
-                $this->fillShiftGaps($currentDate, $shiftType, $weekStart, $weekEnd);
+                // Stap B: Gaten opvullen
+                foreach ($shiftsToCheck as $shiftType) {
+                    $this->fillShiftGaps($currentDate, $shiftType, $weekStart, $weekEnd);
+                }
             }
         }
 
-        return redirect('/nieuwegein/schedule')->with('success', 'Rooster gegenereerd volgens de nieuwe regels!');
+        return redirect('/nieuwegein/schedule')->with('success', 'Rooster gegenereerd!');
     }
 
     /**
@@ -185,45 +208,39 @@ class ScheduleController extends Controller
     {
         $dayName = $date->format('l');
 
-        // Haal gebruikers op die deze dag vast werken
-        // We filteren hier alvast op JSON die de dagnaam bevat
+        // Haal gebruikers op met deze vaste dag
         $fixedUsers = User::whereJsonContains('fixed_days', $dayName)->get();
 
         foreach ($fixedUsers as $user) {
-            // Check 1: Heeft deze persoon vandaag al een dienst? (Voorkom dubbel)
+            // Check dubbele shift
             if ($this->userHasShiftToday($user->id, $date)) {
                 continue;
             }
 
-            // Bepaal welke shift ze krijgen
+            // Bepaal shift type
             $targetShift = null;
 
             if (in_array('DAY', $availableShifts)) {
                 $targetShift = 'DAY';
             } else {
-                // Het is een AM/PM dag. Kijk naar voorkeur.
+                // AM/PM bepalen obv voorkeur
                 $pref = Availability::where('user_id', $user->id)
                     ->where('day_of_week', $dayName)
                     ->value('shift_preference') ?? 'BOTH';
 
-                // Logica: Als voorkeur AM is, probeer AM. Anders PM. 
-                // Als BOTH: kijk of ze gisteren PM werkten (dan moeten ze nu PM).
                 if ($pref === 'AM') $targetShift = 'AM';
                 elseif ($pref === 'PM') $targetShift = 'PM';
                 else {
-                    // Bij BOTH: Check rusttijd. Als gisteren PM was, moet het vandaag PM zijn.
+                    // Bij BOTH: Check rusttijd (gisteren PM -> vandaag PM)
                     if ($this->workedLateYesterday($user->id, $date)) {
                         $targetShift = 'PM';
                     } else {
-                        // Anders vullen we gewoon de eerste in (bijv AM), de fill-logica balanceert de rest wel.
                         $targetShift = 'AM';
                     }
                 }
             }
 
-            // Voer laatste controles uit (contract en rusttijd) en plan in
-            // isFixed=true zorgt ervoor dat contracturen minder strikt zijn bij vaste dagen, 
-            // maar rusttijden blijven heilig.
+            // Plan in (isFixed = true -> forceert plaatsing tenzij rusttijd geschonden wordt)
             if ($this->canWorkShift($user, $date, $targetShift, $weekStart, $weekEnd, true)) {
                 $this->assignShift($date, $targetShift, $user->id);
             }
@@ -235,9 +252,8 @@ class ScheduleController extends Controller
      */
     private function fillShiftGaps($date, $shiftType, $weekStart, $weekEnd)
     {
-        $targetPerShift = 2; // We willen altijd 2 leiders
+        $targetPerShift = 2; 
 
-        // Hoeveel hebben we er al?
         $currentCount = DB::table('schedules')
             ->where('date', $date->format('Y-m-d'))
             ->where('shift_type', $shiftType)
@@ -247,26 +263,20 @@ class ScheduleController extends Controller
 
         if ($needed <= 0) return;
 
-        // Zoek kandidaten
-        // 1. Moet beschikbaar zijn op deze dag (via Availability tabel)
-        // 2. Mag nog geen vaste dag hebben vandaag (want die zijn al gedaan of hadden niet gekund)
         $dayName = $date->format('l');
         
         $candidates = User::whereHas('availability', function($q) use ($dayName, $shiftType) {
             $q->where('day_of_week', $dayName);
-            
-            // Als we AM zoeken, moet voorkeur AM of BOTH zijn.
             if ($shiftType !== 'DAY') {
                 $q->whereIn('shift_preference', [$shiftType, 'BOTH']);
             }
         })
-        ->inRandomOrder() // Zorgt voor variatie
+        ->inRandomOrder()
         ->get();
 
         foreach ($candidates as $candidate) {
             if ($needed <= 0) break;
 
-            // Check alle harde regels (contract, rusttijd, dubbele shift)
             if ($this->canWorkShift($candidate, $date, $shiftType, $weekStart, $weekEnd)) {
                 $this->assignShift($date, $shiftType, $candidate->id);
                 $needed--;
@@ -275,22 +285,21 @@ class ScheduleController extends Controller
     }
 
     /**
-     * De centrale check-functie voor ALLE regels.
+     * De centrale check-functie voor regels (rusttijd, contracturen, max dagen).
      */
     private function canWorkShift($user, $date, $shiftType, $weekStart, $weekEnd, $isFixed = false)
     {
-        // 1. Dubbele shift check: Werkt deze persoon vandaag al?
+        // 1. Dubbele shift check
         if ($this->userHasShiftToday($user->id, $date)) {
             return false; 
         }
 
-        // 2. Rusttijd check: Gisteren PM -> Vandaag Ochtend (AM) mag NIET.
+        // 2. Rusttijd check: Gisteren PM -> Vandaag AM mag NIET.
         if ($shiftType === 'AM' && $this->workedLateYesterday($user->id, $date)) {
             return false;
         }
 
-        // 3. Contract Checks (Uren & Dagen)
-        // Tel huidige geplande dagen/uren in deze week
+        // 3. Contract Checks
         $shiftsThisWeek = DB::table('schedules')
             ->join('users', 'schedules.user_id', '=', 'users.id')
             ->where('user_id', $user->id)
@@ -299,30 +308,27 @@ class ScheduleController extends Controller
 
         $daysWorkedCount = $shiftsThisWeek->count();
         
-        // Bereken totaal geplande uren
         $hoursWorked = 0;
-        foreach($shiftsThisWeek as $s) {
-            $hoursWorked += $this->calculateShiftHours($s->shift_type, $user);
-        }
+        $avgDuration = ($user->contract_days > 0) ? ($user->contract_hours / $user->contract_days) : 0;
+        $hoursWorked = $daysWorkedCount * $avgDuration;
 
-        // Uren van de NIEUWE shift die we willen inplannen
-        $newShiftHours = $this->calculateShiftHours($shiftType, $user);
+        $newTotalHours = $hoursWorked + $avgDuration;
 
-        // Check: Dagen limiet
-        if ($daysWorkedCount >= $user->contract_days) {
-            return false;
-        }
-
-        // Check: Uren limiet
-        if (($hoursWorked + $newShiftHours) > $user->contract_hours) {
-            return false;
+        // Bij vaste dagen zijn we soepel met contractlimieten, anders blokkeren we.
+        if (!$isFixed) {
+            if ($daysWorkedCount >= $user->contract_days) {
+                return false;
+            }
+            if ($newTotalHours > $user->contract_hours) {
+                return false;
+            }
         }
 
         return true;
     }
 
     // ==========================================
-    // HELPER FUNCTIES
+    // HELPER FUNCTIES (INTERN)
     // ==========================================
 
     private function userHasShiftToday($userId, $date) {
@@ -337,21 +343,11 @@ class ScheduleController extends Controller
         return DB::table('schedules')
             ->where('user_id', $userId)
             ->where('date', $yesterday)
-            ->where('shift_type', 'PM') // Laat gewerkt
+            ->where('shift_type', 'PM')
             ->exists();
     }
 
-    private function calculateShiftHours($shiftType, $user) {
-        if ($shiftType === 'DAY') {
-            return 9; // Dagdienst is vast 9 uur (09:00 - 18:00)
-        }
-        // AM/PM is contract afhankelijk (bijv 32u / 4d = 8u)
-        return ($user->contract_days > 0) ? ($user->contract_hours / $user->contract_days) : 0;
-    }
-
     private function assignShift($date, $shift, $userId) {
-        // Dubbelcheck voor de zekerheid (race conditions)
-        // Een gebruiker mag maar 1 dienst per dag hebben
         $exists = DB::table('schedules')
             ->where('user_id', $userId)
             ->where('date', $date->format('Y-m-d'))
@@ -373,7 +369,7 @@ class ScheduleController extends Controller
     }
 
     // ==========================================
-    // 5. OVERIGE ACTIES (EDIT/DELETE)
+    // 5. OVERIGE ACTIES
     // ==========================================
 
     public function editUser($id) {
@@ -412,9 +408,6 @@ class ScheduleController extends Controller
         return redirect('/nieuwegein/team')->with('success', 'Collega verwijderd.');
     }
 
-    /**
-     * Haalt details op voor een specifieke datum (voor de pop-up).
-     */
     public function getDayDetails($date) {
         $schedules = DB::table('schedules')
             ->join('users', 'schedules.user_id', '=', 'users.id')
@@ -423,7 +416,6 @@ class ScheduleController extends Controller
             ->orderBy('users.name')
             ->get();
 
-        // Groepeer de data zodat we het makkelijk kunnen tonen
         $grouped = [
             'AM' => [],
             'PM' => [],
@@ -431,16 +423,11 @@ class ScheduleController extends Controller
         ];
 
         foreach($schedules as $row) {
-            // Bereken eindtijd voor weergave
-            $hoursPerShift = ($row->contract_days > 0) ? ($row->contract_hours / $row->contract_days) : 0;
+            $times = $this->calculateShiftTimes($date, $row->shift_type, $row->contract_hours, $row->contract_days);
             
-            if ($row->shift_type == 'AM') {
-                $timeStr = '05:00 - ' . Carbon::parse('05:00')->addHours($hoursPerShift)->format('H:i');
-            } elseif ($row->shift_type == 'PM') {
-                $timeStr = '14:00 - ' . Carbon::parse('14:00')->addHours($hoursPerShift)->format('H:i');
-            } else {
-                $timeStr = '09:00 - 18:00';
-            }
+            $startStr = Carbon::parse($times['start'])->format('H:i');
+            $endStr   = Carbon::parse($times['end'])->format('H:i');
+            $timeStr  = "$startStr - $endStr";
 
             $grouped[$row->shift_type][] = [
                 'name' => $row->name,
